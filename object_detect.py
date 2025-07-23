@@ -46,6 +46,35 @@ def run_detection(kmodel_path, score_thresh, nms_thresh, image_path, debug_level
     return detections
 
 
+def detect_from_cv_image(
+    kmodel_path,
+    score_thresh,
+    nms_thresh,
+    cv_image,
+    debug_level=0,
+    temp_image_path="temp_detect.jpg",
+):
+    """
+    从OpenCV图像数据进行目标检测
+    :param kmodel_path: 模型路径
+    :param score_thresh: 分数阈值
+    :param nms_thresh: NMS阈值
+    :param cv_image: OpenCV图像数据
+    :param debug_level: 调试级别
+    :param temp_image_path: 临时保存图片的路径
+    :return: 检测结果列表
+    """
+    # 保存OpenCV图像到临时文件
+    cv2.imwrite(temp_image_path, cv_image)
+
+    # 调用现有的检测函数
+    detections = run_detection(
+        kmodel_path, score_thresh, nms_thresh, temp_image_path, debug_level
+    )
+
+    return detections
+
+
 def save_results(image_path, detections, output_path="output.jpg"):
     """
     保存检测结果到图片（替代 imshow）
@@ -118,6 +147,94 @@ def benchmark_detection(
     return avg_time
 
 
+def benchmark_camera_detection(
+    kmodel_path,
+    score_thresh,
+    nms_thresh,
+    camera_device="/dev/video1",
+    debug_level=0,
+    runs=10,
+    temp_image_path="temp_camera.jpg",
+    output_prefix="camera_output",
+):
+    """
+    从摄像头读取帧进行基准测试
+    :param camera_device: 摄像头设备路径 (默认 "/dev/video1")
+    :param runs: 运行次数 (默认10次)
+    :param temp_image_path: 临时保存图片的路径
+    :param output_prefix: 输出结果图片前缀
+    :return: 平均耗时 (秒)
+    """
+    cap = cv2.VideoCapture(camera_device)
+    if not cap.isOpened():
+        print(f"Error: Could not open camera {camera_device}")
+        return -1
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
+    total_time = 0
+    successful_runs = 0
+
+    try:
+        for i in range(runs):
+            # 读取摄像头帧
+            ret, frame = cap.read()
+            if not ret:
+                print(f"Run {i + 1}/{runs}: Failed to capture frame")
+                continue
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # 执行检测
+            start_time = time.time()
+            detections = detect_from_cv_image(
+                kmodel_path,
+                score_thresh,
+                nms_thresh,
+                frame,
+                debug_level,
+                temp_image_path,
+            )
+            elapsed = time.time() - start_time
+
+            # 处理结果
+            print(f"Run {i + 1}/{runs}:")
+            if detections:
+                successful_runs += 1
+                total_time += elapsed
+                print(f"  Detected {len(detections)} objects in {elapsed:.4f} seconds")
+                for det in detections:
+                    print(
+                        f"Class: {det['className']} (ID: {det['class_id']}), "
+                        f"Confidence: {det['confidence']:.4f}, "
+                        f"Box: [x={det['box']['x']}, y={det['box']['y']}, "
+                        f"w={det['box']['width']}, h={det['box']['height']}]"
+                    )
+
+                # 保存带结果的图片
+                output_path = f"{output_prefix}_{i + 1}.jpg"
+                save_results(temp_image_path, detections, output_path)
+            else:
+                print("  No objects detected!")
+            print("-" * 40)
+
+    finally:
+        cap.release()
+
+    if successful_runs > 0:
+        avg_time = total_time / successful_runs
+        print(
+            f"\nCamera benchmark completed (successful runs={successful_runs}/{runs}):"
+        )
+        print(f"  Total time: {total_time:.4f} seconds")
+        print(f"  Average time per run: {avg_time:.4f} seconds")
+        return avg_time
+    else:
+        print("\nCamera benchmark failed - no successful runs")
+        return -1
+
+
 if __name__ == "__main__":
     # 示例调用
     kmodel = "yolov8n_640.kmodel"
@@ -127,4 +244,19 @@ if __name__ == "__main__":
     debug_level = 0
 
     # 运行基准测试
-    avg_time = benchmark_detection(kmodel, score_thresh, nms_thresh, image, debug_level)
+    avg_time = benchmark_detection(
+        kmodel_path=kmodel,
+        score_thresh=score_thresh,
+        nms_thresh=nms_thresh,
+        image_path=image,
+        debug_level=debug_level,
+    )
+    # 摄像头基准测试示例
+    camera_benchmark = benchmark_camera_detection(
+        kmodel_path=kmodel,
+        score_thresh=score_thresh,
+        nms_thresh=nms_thresh,
+        camera_device="/dev/video1",
+        debug_level=debug_level,
+        runs=10,
+    )
