@@ -13,7 +13,9 @@ import time
 import cv2
 
 
-def run_detection(kmodel_path, score_thresh, nms_thresh, image_path, debug_level=0):
+def run_detection(
+    kmodel_path, score_thresh, nms_thresh, image_path, debug_level=0, model_type="cloud"
+):
     """
     调用 C++ 检测程序并解析结果
     :param kmodel_path: 模型路径 (e.g., "yolov8n_640.kmodel")
@@ -23,15 +25,26 @@ def run_detection(kmodel_path, score_thresh, nms_thresh, image_path, debug_level
     :param debug_level: 调试级别 (0-2)
     :return: 解析后的检测结果列表
     """
-    cmd = [
-        "./ob_det.elf",
-        kmodel_path,
-        str(score_thresh),
-        str(nms_thresh),
-        image_path,
-        str(debug_level),
-    ]
+    if model_type == "yolo":
+        cmd = [
+            "./ob_det.elf",
+            kmodel_path,
+            str(score_thresh),
+            str(nms_thresh),
+            image_path,
+            str(debug_level),
+        ]
+    elif model_type == "cloud":
+        cmd = [
+            "./detection.elf",
+            "deploy_config.json",
+            image_path,
+            str(debug_level),
+        ]
+
     result = subprocess.run(cmd, capture_output=True, text=True)
+
+    print(result)
 
     if result.returncode != 0:
         print(f"Error running C++ program:\n{result.stderr}")
@@ -53,6 +66,7 @@ def detect_from_cv_image(
     cv_image,
     debug_level=0,
     temp_image_path="temp_detect.jpg",
+    model_type="cloud",
 ):
     """
     从OpenCV图像数据进行目标检测
@@ -69,7 +83,7 @@ def detect_from_cv_image(
 
     # 调用现有的检测函数
     detections = run_detection(
-        kmodel_path, score_thresh, nms_thresh, temp_image_path, debug_level
+        kmodel_path, score_thresh, nms_thresh, temp_image_path, debug_level, model_type
     )
 
     return detections
@@ -85,12 +99,11 @@ def save_results(image_path, detections, output_path="output.jpg"):
     image = cv2.imread(image_path)
     for det in detections:
         box = det["box"]
-        color = det["color"]
         cv2.rectangle(
             image,
             (box["x"], box["y"]),
-            (box["x"] + box["width"], box["y"] + box["height"]),
-            (int(color[0]), int(color[1]), int(color[2])),  # 确保颜色为整数
+            (box["width"], box["height"]),
+            (int(255), int(0), int(0)),  # 确保颜色为整数
             2,
         )
         label = f"{det['className']} {det['confidence']:.2f}"
@@ -110,7 +123,13 @@ def save_results(image_path, detections, output_path="output.jpg"):
 
 
 def benchmark_detection(
-    kmodel_path, score_thresh, nms_thresh, image_path, debug_level=0, runs=10
+    kmodel_path,
+    score_thresh,
+    nms_thresh,
+    image_path,
+    debug_level=0,
+    runs=10,
+    model_type="cloud",
 ):
     """
     连续运行多次检测并统计耗时
@@ -121,7 +140,7 @@ def benchmark_detection(
     for i in range(runs):
         start_time = time.time()
         detections = run_detection(
-            kmodel_path, score_thresh, nms_thresh, image_path, debug_level
+            kmodel_path, score_thresh, nms_thresh, image_path, debug_level, model_type
         )
         elapsed = time.time() - start_time
         total_time += elapsed
@@ -156,6 +175,7 @@ def benchmark_camera_detection(
     runs=10,
     temp_image_path="temp_camera.jpg",
     output_prefix="camera_output",
+    model_type="cloud",
 ):
     """
     从摄像头读取帧进行基准测试
@@ -195,6 +215,7 @@ def benchmark_camera_detection(
                 frame,
                 debug_level,
                 temp_image_path,
+                model_type,
             )
             elapsed = time.time() - start_time
 
@@ -243,15 +264,7 @@ if __name__ == "__main__":
     image = "bus.jpg"
     debug_level = 0
 
-    # 运行基准测试
-    avg_time = benchmark_detection(
-        kmodel_path=kmodel,
-        score_thresh=score_thresh,
-        nms_thresh=nms_thresh,
-        image_path=image,
-        debug_level=debug_level,
-    )
-    # 摄像头基准测试示例
+    # 摄像头基准测试
     camera_benchmark = benchmark_camera_detection(
         kmodel_path=kmodel,
         score_thresh=score_thresh,
