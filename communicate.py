@@ -129,6 +129,29 @@ class SerialPort:
             os.write(self.ser_fd, packet)
             logger.debug(f"Sent: {packet.hex(' ')}")
 
+    def set_pid(self, type, kp, ki, kd) :
+        command = 0x00
+        if type == "motor":
+            command = 0x23
+        elif type == "gyro":
+            command = 0x22
+        elif type == "camera":
+            command = 0x21
+        elif type == "yaw":
+            command = 0x20
+        
+        self.send_command_with_3_floats(command, kp, ki, kd)
+
+    def set_target(self, type, target) :
+        command = 0x00
+        if type == "speed":
+            command = 0x12
+        elif type == "yaw":
+            command = 0x11
+        elif type == "camera":
+            command = 0x10
+        
+        self.send_command_with_1_float(command, target)
 
 def parse_user_input(user_input):
     """解析用户输入
