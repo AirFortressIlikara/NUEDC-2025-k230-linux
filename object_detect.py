@@ -248,8 +248,8 @@ if __name__ == "__main__":
     # )
     detector = ObjectDetector(
         model_type="yolo",
-        score_thresh=0.25,
-        nms_thresh=0.5,
+        score_thresh=0.1,
+        nms_thresh=0.3,
         debug_level=0,
         kmodel_path="./best.kmodel",
     )

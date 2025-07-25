@@ -12,20 +12,15 @@ import cv2
 import threading
 import subprocess
 import os
+import numpy as np
 from queue import Queue
-from red_line_tracker import RedLineTracker
+from red_line_tracker import find_red_segments_cv
 from object_detect import ObjectDetector
 from communicate import SerialPort
 
 state = 0
 state_depth = 0
 dest_room = 0
-
-
-import os
-import subprocess
-import time
-
 
 def restart_camera_driver():
     # 使用 killall 终止所有 isp_media_server 进程
@@ -88,7 +83,6 @@ class ProcessingThread(threading.Thread):
         super().__init__()
         self.camera_thread = camera_thread
         self.interval = interval
-        self.tracker = RedLineTracker(smooth_window=3)
         self.detector = ObjectDetector(
             model_type="yolo",
             score_thresh=0.25,
@@ -108,21 +102,27 @@ class ProcessingThread(threading.Thread):
                 frame = self.camera_thread.frame_queue.get()
 
                 # 处理图像
-                resized_frame = cv2.resize(frame, (160, 90))
-                cx, cross_center = self.tracker.process(resized_frame, 30)  # 30为前瞻
-
-                if cross_center:
-                    print(f"{start_time}: cross: {cross_center}")
-                # print(f"{start_time}: mid: {80 - cx}")
-                self.serial.set_target("camera", 80 - cx)
+                results = find_red_segments_cv(frame, [90, 180, 270])
+                row = 180
+                first_midpoint = 0
+                if row in results and len(results[row]) > 0:
+                    first_midpoint = results[row][0][1]  # 第一个片段的中点是索引1
+                else:
+                    continue
+                print(f"{start_time}: mid: {first_midpoint}")
+                self.serial.set_target("camera", first_midpoint - 320)
+                self.serial.set_target("camera", first_midpoint - 320)
 
             # 计算执行时间并补偿延迟
             execution_time = time.time() - start_time
             sleep_time = max(0, self.interval - execution_time)
-            print(f"sleep_time: {sleep_time}")
             time.sleep(sleep_time)
 
     def stop(self):
+        self.serial.set_target("speed", 0)
+        self.serial.set_target("speed", 0)
+        self.serial.set_target("speed", 0)
+        self.serial.set_target("speed", 0)
         self.running = False
 
 
@@ -136,6 +136,23 @@ if __name__ == "__main__":
 
         # 创建并启动处理线程
         processing_thread = ProcessingThread(camera_thread)
+        processing_thread.serial.set_pid("motor", 1, 0.5, 0)
+        processing_thread.serial.set_pid("motor", 1, 0.5, 0)
+        # processing_thread.serial.set_pid("gyro", 0.2, 0.1, 0)
+        # processing_thread.serial.set_pid("gyro", 0.2, 0.1, 0)
+        processing_thread.serial.set_pid("camera", 1, 0, 1)
+        processing_thread.serial.set_pid("camera", 1, 0, 1)
+        processing_thread.serial.set_target("speed", 0)
+        processing_thread.serial.set_target("speed", 0)
+
+        if not camera_thread.frame_queue.empty():
+            results = processing_thread.detector.detect_from_cv_image(
+                camera_thread.frame_queue.get()
+            )
+
+        processing_thread.serial.set_target("speed", 500)
+        processing_thread.serial.set_target("speed", 500)
+
         processing_thread.start()
 
         # 主线程等待
