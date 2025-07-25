@@ -7,15 +7,6 @@ class RedLineTracker:
     def __init__(self, smooth_window=3, cross_range=20):
         self.smooth_window = smooth_window
         self.cross_range = cross_range
-        # 初始化摄像头
-        self.cap = cv2.VideoCapture(1)
-        # 检查摄像头是否成功打开
-        if not self.cap.isOpened():
-            print("无法打开摄像头")
-            return
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
 
     def extract_red_mask(self, bgr_img):
         hsv_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
@@ -137,26 +128,22 @@ class RedLineTracker:
 
         return center_x, cross_center  # 中线， 十字坐标
 
-    def __del__(self):
-        self.cap.release()
 
-
-# 示例
-# if __name__ == "__main__":
-#     tracker = RedLineTracker(smooth_window=3)
-#     n=1
-#     while True:
-#         n=n+1
-#         print(n)
-#         ret, frame = tracker.cap.read()
-#         if ret:
-#             cx, cross_center = tracker.process(frame,30) #30为前瞻
-#             if cross_center:
-#                 print(f"检测到十字，中心位置: {cross_center}")
-#             else:
-#                 print("未检测到十字")
-#             print(f"中线位置 x = {cx}")
-#         else:
-#             print("无法捕获图像")
-#             break
-#     del tracker
+if __name__ == "__main__":
+    tracker = RedLineTracker(smooth_window=3)
+    n = 1
+    while True:
+        n = n + 1
+        print(n)
+        ret, frame = tracker.cap.read()
+        if ret:
+            cx, cross_center = tracker.process(frame, 30)  # 30为前瞻
+            if cross_center:
+                print(f"检测到十字，中心位置: {cross_center}")
+            else:
+                print("未检测到十字")
+            print(f"中线位置 x = {cx}")
+        else:
+            print("无法捕获图像")
+            break
+    del tracker
