@@ -100,7 +100,7 @@ class SerialPort:
         格式: 55 [1字节指令号] [3*小端序浮点数] 01
         """
         # 打包数据
-        header = bytes([0x55, command_code])
+        header = bytes([0x00, 0x00, 0x00, 0x00, 0x55, command_code])
         floats = struct.pack("<fff", float1, float2, float3)
         footer = bytes([0x01])
 
@@ -117,7 +117,7 @@ class SerialPort:
         格式: 55 [1字节指令号] [1*小端序浮点数] 01
         """
         # 打包数据
-        header = bytes([0x55, command_code])
+        header = bytes([0x00, 0x00, 0x00, 0x00, 0x55, command_code])
         floats = struct.pack("<f", float1)
         footer = bytes([0x01])
 
@@ -201,6 +201,10 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     serial = SerialPort(serial_port=args.serial, baudrate=args.baud)
+
+    serial.set_pid("motor", 1, 0.5, 0)
+    serial.set_pid("gyro", 0.2, 0.1, 0)
+
 
     logger.info(f"Serial port {args.serial} opened at {args.baud} baud")
     logger.info("Enter commands in the format:")

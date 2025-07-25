@@ -258,7 +258,7 @@ def benchmark_camera_detection(
 
 if __name__ == "__main__":
     # 示例调用
-    kmodel = "yolov8n_640.kmodel"
+    kmodel = "best.kmodel"
     score_thresh = 0.3
     nms_thresh = 0.5
     image = "bus.jpg"
@@ -272,4 +272,5 @@ if __name__ == "__main__":
         camera_device="/dev/video1",
         debug_level=debug_level,
         runs=10,
+        model_type="yolo",
     )
